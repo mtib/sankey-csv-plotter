@@ -20,6 +20,7 @@ class CSVPlotter {
     private csvData: CSVRecord[] = [];
     private headers: string[] = [];
     private selectedNodes: Set<number> = new Set();
+    private clickedNodes: Set<number> = new Set(); // Track which nodes were clicked vs hovered
 
     constructor() {
         this.initializeElements();
@@ -531,25 +532,33 @@ class CSVPlotter {
     }
 
     private handleNodeHover(nodeIndex: number, rect: SVGRectElement, text: SVGTextElement) {
+        // Always add to selection on hover (temporarily if not clicked)
         if (!this.selectedNodes.has(nodeIndex)) {
+            this.selectedNodes.add(nodeIndex);
             text.setAttribute('font-weight', 'bold');
             rect.setAttribute('stroke-width', '3');
         }
     }
     
     private handleNodeUnhover(nodeIndex: number, rect: SVGRectElement, text: SVGTextElement) {
-        if (!this.selectedNodes.has(nodeIndex)) {
+        // Only remove if it was added by hover (not by click)
+        if (this.selectedNodes.has(nodeIndex) && !this.clickedNodes.has(nodeIndex)) {
+            this.selectedNodes.delete(nodeIndex);
             text.setAttribute('font-weight', 'normal');
             rect.setAttribute('stroke-width', '1');
         }
     }
     
     private toggleNodeSelection(nodeIndex: number, rect: SVGRectElement, text: SVGTextElement) {
-        if (this.selectedNodes.has(nodeIndex)) {
+        if (this.clickedNodes.has(nodeIndex)) {
+            // Was clicked before - remove from both clicked and selected
+            this.clickedNodes.delete(nodeIndex);
             this.selectedNodes.delete(nodeIndex);
             text.setAttribute('font-weight', 'normal');
             rect.setAttribute('stroke-width', '1');
         } else {
+            // Not clicked before - add to clicked (and ensure it's selected)
+            this.clickedNodes.add(nodeIndex);
             this.selectedNodes.add(nodeIndex);
             text.setAttribute('font-weight', 'bold');
             rect.setAttribute('stroke-width', '3');
@@ -628,6 +637,7 @@ class CSVPlotter {
     
     private clearAllSelections(g: SVGGElement) {
         this.selectedNodes.clear();
+        this.clickedNodes.clear();
         
         // Reset all node visual states
         const nodeGroups = g.querySelectorAll('.node');
@@ -818,6 +828,7 @@ class CSVPlotter {
         this.csvData = [];
         this.headers = [];
         this.selectedNodes.clear();
+        this.clickedNodes.clear();
         this.fileInput.value = '';
         this.fileInfo.style.display = 'none';
         this.dataSummary.style.display = 'none';
