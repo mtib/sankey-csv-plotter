@@ -237,7 +237,7 @@ class CSVPlotter {
                 nodeMap.set(id, nodeIndex);
                 nodes.push({
                     id,
-                    label: `${header}: ${value}`,
+                    label: value, // Just show the value, not "header: value"
                     header,
                     value,
                     dimIndex,
@@ -460,8 +460,8 @@ class CSVPlotter {
             rect.setAttribute('height', pos.height.toString());
             rect.setAttribute('fill', colors[node.dimIndex % colors.length]);
             rect.setAttribute('stroke', '#333');
-            rect.setAttribute('stroke-width', '1');
-            rect.setAttribute('rx', '5');
+            rect.setAttribute('stroke-width', '0.5'); // Thinner border when not selected
+            rect.setAttribute('rx', '2'); // Reduced border rounding
             rect.style.cursor = 'pointer';
             
             // Node label
@@ -545,7 +545,7 @@ class CSVPlotter {
         if (this.selectedNodes.has(nodeIndex) && !this.clickedNodes.has(nodeIndex)) {
             this.selectedNodes.delete(nodeIndex);
             text.setAttribute('font-weight', 'normal');
-            rect.setAttribute('stroke-width', '1');
+            rect.setAttribute('stroke-width', '0.5'); // Thinner border when unselected
         }
     }
     
@@ -555,7 +555,7 @@ class CSVPlotter {
             this.clickedNodes.delete(nodeIndex);
             this.selectedNodes.delete(nodeIndex);
             text.setAttribute('font-weight', 'normal');
-            rect.setAttribute('stroke-width', '1');
+            rect.setAttribute('stroke-width', '0.5'); // Thinner border when unselected
         } else {
             // Not clicked before - add to clicked (and ensure it's selected)
             this.clickedNodes.add(nodeIndex);
@@ -646,7 +646,7 @@ class CSVPlotter {
             const text = nodeGroup.querySelector('text') as SVGTextElement;
             if (rect && text) {
                 text.setAttribute('font-weight', 'normal');
-                rect.setAttribute('stroke-width', '1');
+                rect.setAttribute('stroke-width', '0.5'); // Thinner border when unselected
             }
         });
         
