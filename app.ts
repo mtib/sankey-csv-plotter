@@ -157,106 +157,262 @@ class CSVPlotter {
     private generatePlot(): void {
         const dimensionHeaders = this.headers.slice(0, -1);
         
-        if (dimensionHeaders.length >= 3) {
-            this.create3DPlot(dimensionHeaders);
-        } else if (dimensionHeaders.length === 2) {
-            this.create2DPlot(dimensionHeaders);
+        if (dimensionHeaders.length >= 2) {
+            this.createSankeyDiagram(dimensionHeaders);
         } else {
             this.createBarChart(dimensionHeaders);
         }
+    }
 
-        if (dimensionHeaders.length >= 2) {
-            this.createHeatmap(dimensionHeaders);
+    private createSankeyDiagram(dimensionHeaders: string[]): void {
+        // Create nodes and links for the Sankey diagram
+        const nodes: string[] = [];
+        const nodeIndices = new Map<string, number>();
+        const nodeToHeader = new Map<number, string>();
+        const nodeToValue = new Map<number, string>();
+        
+        // Collect all unique values from all dimensions with their dimension prefix
+        dimensionHeaders.forEach(header => {
+            const uniqueValues = [...new Set(this.csvData.map(r => r[header] as string))];
+            uniqueValues.forEach(value => {
+                const nodeLabel = `${header}: ${value}`;
+                if (!nodeIndices.has(nodeLabel)) {
+                    const nodeIndex = nodes.length;
+                    nodeIndices.set(nodeLabel, nodeIndex);
+                    nodes.push(nodeLabel);
+                    nodeToHeader.set(nodeIndex, header);
+                    nodeToValue.set(nodeIndex, value);
+                }
+            });
+        });
+
+        // Create links between consecutive dimensions
+        const links: { source: number; target: number; value: number; label: string; records: CSVRecord[] }[] = [];
+        
+        for (let dimIndex = 0; dimIndex < dimensionHeaders.length - 1; dimIndex++) {
+            const sourceHeader = dimensionHeaders[dimIndex];
+            const targetHeader = dimensionHeaders[dimIndex + 1];
+            
+            // Group data by source-target pairs
+            const linkMap = new Map<string, {value: number, records: CSVRecord[]}>();
+            
+            this.csvData.forEach(record => {
+                const sourceValue = record[sourceHeader] as string;
+                const targetValue = record[targetHeader] as string;
+                const sourceLabel = `${sourceHeader}: ${sourceValue}`;
+                const targetLabel = `${targetHeader}: ${targetValue}`;
+                const linkKey = `${sourceLabel} → ${targetLabel}`;
+                
+                if (!linkMap.has(linkKey)) {
+                    linkMap.set(linkKey, {value: 0, records: []});
+                }
+                const linkData = linkMap.get(linkKey)!;
+                linkData.value += record.count;
+                linkData.records.push(record);
+            });
+            
+            // Convert to links array
+            linkMap.forEach((linkData, linkKey) => {
+                const [sourceLabel, targetLabel] = linkKey.split(' → ');
+                const sourceIndex = nodeIndices.get(sourceLabel);
+                const targetIndex = nodeIndices.get(targetLabel);
+                
+                if (sourceIndex !== undefined && targetIndex !== undefined) {
+                    links.push({
+                        source: sourceIndex,
+                        target: targetIndex,
+                        value: linkData.value,
+                        label: linkKey,
+                        records: linkData.records
+                    });
+                }
+            });
         }
-    }
 
-    private create3DPlot(dimensionHeaders: string[]): void {
-        const xHeader = dimensionHeaders[0];
-        const yHeader = dimensionHeaders[1];
-        const zHeader = dimensionHeaders[2];
+        // Create color scheme for different dimensions
+        const colors = [
+            'rgba(102, 126, 234, 0.8)',  // Blue
+            'rgba(234, 102, 126, 0.8)',  // Red
+            'rgba(126, 234, 102, 0.8)',  // Green
+            'rgba(234, 202, 102, 0.8)',  // Yellow
+            'rgba(202, 102, 234, 0.8)',  // Purple
+            'rgba(102, 234, 202, 0.8)',  // Cyan
+        ];
+
+        // Assign colors to nodes based on their dimension
+        const nodeColors = nodes.map(node => {
+            const dimensionIndex = dimensionHeaders.findIndex(header => node.startsWith(header + ':'));
+            return colors[dimensionIndex % colors.length];
+        });
+
+        // Original link colors (will be modified on hover)
+        const originalLinkColors = links.map(() => 'rgba(150, 150, 150, 0.4)');
 
         const trace = {
-            x: this.csvData.map(r => r[xHeader]),
-            y: this.csvData.map(r => r[yHeader]),
-            z: this.csvData.map(r => r[zHeader]),
-            mode: 'markers',
-            marker: {
-                size: this.csvData.map(r => Math.max(5, Math.min(20, r.count / Math.max(1, Math.max(...this.csvData.map(d => d.count)) / 20)))),
-                color: this.csvData.map(r => r.count),
-                colorscale: 'Viridis',
-                showscale: true,
-                colorbar: {
-                    title: 'Count'
+            type: 'sankey',
+            orientation: 'h',
+            node: {
+                pad: 15,
+                thickness: 30,
+                line: {
+                    color: 'black',
+                    width: 0.5
                 },
-                opacity: 0.8
+                label: nodes,
+                color: nodeColors
             },
-            type: 'scatter3d',
-            text: this.csvData.map(r => {
-                const dims = dimensionHeaders.map(h => `${h}: ${r[h]}`).join('<br>');
-                return `${dims}<br>Count: ${r.count}`;
-            }),
-            hovertemplate: '%{text}<extra></extra>'
+            link: {
+                source: links.map(link => link.source),
+                target: links.map(link => link.target),
+                value: links.map(link => link.value),
+                label: links.map(link => link.label),
+                color: originalLinkColors,
+                hovertemplate: '%{label}<br>Flow: %{value}<extra></extra>'
+            }
         };
 
         const layout = {
             title: {
-                text: 'CSV Data Visualization (3D)',
+                text: 'Data Flow Visualization (Sankey Diagram)',
                 font: { size: 18 }
             },
-            scene: {
-                xaxis: { title: xHeader },
-                yaxis: { title: yHeader },
-                zaxis: { title: zHeader }
-            },
-            margin: { l: 0, r: 0, b: 0, t: 40 },
+            font: { size: 10 },
+            margin: { l: 10, r: 10, b: 10, t: 60 },
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)'
         };
 
+        const config = {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d']
+        };
+
         this.plotContainer.innerHTML = '';
-        (window as any).Plotly.newPlot(this.plotContainer, [trace], layout, { responsive: true });
+        (window as any).Plotly.newPlot(this.plotContainer, [trace], layout, config).then(() => {
+            // Add advanced hover interactions after plot is created
+            (this.plotContainer as any).on('plotly_hover', (eventData: any) => {
+                if (eventData.points[0].pointNumber !== undefined) {
+                    const nodeIndex = eventData.points[0].pointNumber;
+                    this.handleNodeHover(nodeIndex, links, nodeToHeader, nodeToValue, dimensionHeaders, originalLinkColors);
+                }
+            });
+
+            (this.plotContainer as any).on('plotly_unhover', () => {
+                this.resetLinkColors(originalLinkColors);
+            });
+        });
     }
 
-    private create2DPlot(dimensionHeaders: string[]): void {
-        const xHeader = dimensionHeaders[0];
-        const yHeader = dimensionHeaders[1];
+    private handleNodeHover(
+        hoveredNodeIndex: number,
+        links: { source: number; target: number; value: number; label: string; records: CSVRecord[] }[],
+        nodeToHeader: Map<number, string>,
+        nodeToValue: Map<number, string>,
+        dimensionHeaders: string[],
+        originalLinkColors: string[]
+    ): void {
+        const hoveredHeader = nodeToHeader.get(hoveredNodeIndex);
+        const hoveredValue = nodeToValue.get(hoveredNodeIndex);
+        
+        if (!hoveredHeader || !hoveredValue) return;
 
-        const trace = {
-            x: this.csvData.map(r => r[xHeader]),
-            y: this.csvData.map(r => r[yHeader]),
-            mode: 'markers',
-            marker: {
-                size: this.csvData.map(r => Math.max(8, Math.min(30, r.count / Math.max(1, Math.max(...this.csvData.map(d => d.count)) / 30)))),
-                color: this.csvData.map(r => r.count),
-                colorscale: 'Viridis',
-                showscale: true,
-                colorbar: {
-                    title: 'Count'
-                },
-                opacity: 0.7
-            },
-            type: 'scatter',
-            text: this.csvData.map(r => {
-                const dims = dimensionHeaders.map(h => `${h}: ${r[h]}`).join('<br>');
-                return `${dims}<br>Count: ${r.count}`;
-            }),
-            hovertemplate: '%{text}<extra></extra>'
-        };
+        // Find all records that have the hovered value
+        const recordsWithHoveredValue = this.csvData.filter(record => 
+            record[hoveredHeader] === hoveredValue
+        );
 
-        const layout = {
-            title: {
-                text: 'CSV Data Visualization (2D)',
-                font: { size: 18 }
-            },
-            xaxis: { title: xHeader },
-            yaxis: { title: yHeader },
-            margin: { l: 60, r: 40, b: 60, t: 60 },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)'
-        };
+        // Calculate connection strengths and proportions for other dimension pairs
+        const connectionData = new Map<string, {withHovered: number, total: number}>();
+        
+        // First pass: count total connections for each pair
+        for (let i = 0; i < dimensionHeaders.length - 1; i++) {
+            for (let j = i + 1; j < dimensionHeaders.length; j++) {
+                if (dimensionHeaders[i] === hoveredHeader || dimensionHeaders[j] === hoveredHeader) continue;
+                
+                const header1 = dimensionHeaders[i];
+                const header2 = dimensionHeaders[j];
+                
+                // Count total connections
+                this.csvData.forEach(record => {
+                    const key = `${header1}:${record[header1]} ↔ ${header2}:${record[header2]}`;
+                    if (!connectionData.has(key)) {
+                        connectionData.set(key, {withHovered: 0, total: 0});
+                    }
+                    connectionData.get(key)!.total += record.count;
+                });
+                
+                // Count connections with hovered value
+                recordsWithHoveredValue.forEach(record => {
+                    const key = `${header1}:${record[header1]} ↔ ${header2}:${record[header2]}`;
+                    if (connectionData.has(key)) {
+                        connectionData.get(key)!.withHovered += record.count;
+                    }
+                });
+            }
+        }
 
-        this.plotContainer.innerHTML = '';
-        (window as any).Plotly.newPlot(this.plotContainer, [trace], layout, { responsive: true });
+        // Color links based on rules
+        const newLinkColors = links.map((link) => {
+            const sourceNodeIndex = link.source;
+            const targetNodeIndex = link.target;
+            const sourceHeader = nodeToHeader.get(sourceNodeIndex);
+            const targetHeader = nodeToHeader.get(targetNodeIndex);
+            const sourceValue = nodeToValue.get(sourceNodeIndex);
+            const targetValue = nodeToValue.get(targetNodeIndex);
+            
+            // Rule 1: Only highlight direct links that contain records with the hovered value
+            if (sourceNodeIndex === hoveredNodeIndex || targetNodeIndex === hoveredNodeIndex) {
+                // Check if any of the records in this link contain the hovered value
+                const linkContainsHoveredValue = link.records.some(record => 
+                    record[hoveredHeader] === hoveredValue
+                );
+                
+                if (linkContainsHoveredValue) {
+                    return 'rgba(255, 215, 0, 0.8)'; // Gold for direct connections with hovered value
+                } else {
+                    return 'rgba(200, 200, 200, 0.2)'; // Fade out direct links without hovered value
+                }
+            }
+
+            // Rule 2: Color based on proportion of records with hovered value
+            if (sourceHeader && targetHeader && sourceValue && targetValue) {
+                const connectionKey1 = `${sourceHeader}:${sourceValue} ↔ ${targetHeader}:${targetValue}`;
+                const connectionKey2 = `${targetHeader}:${targetValue} ↔ ${sourceHeader}:${sourceValue}`;
+                
+                const data1 = connectionData.get(connectionKey1);
+                const data2 = connectionData.get(connectionKey2);
+                const data = data1 || data2;
+                
+                if (data && data.total > 0) {
+                    const proportion = data.withHovered / data.total;
+                    
+                    if (proportion >= 0.3) {
+                        // High proportion: Gold with intensity based on proportion
+                        const intensity = Math.min(1.0, proportion * 1.2); // Cap at full intensity
+                        return `rgba(255, 215, 0, ${0.4 + intensity * 0.4})`; // Gold from 0.4 to 0.8 opacity
+                    } else if (proportion > 0) {
+                        // Low proportion: Faded with very low intensity
+                        const intensity = proportion / 0.3; // Scale 0-0.3 to 0-1
+                        return `rgba(180, 180, 180, ${0.2 + intensity * 0.3})`; // Light gray from 0.2 to 0.5 opacity
+                    }
+                }
+            }
+
+            // Default: fade out unrelated links
+            return 'rgba(200, 200, 200, 0.2)';
+        });
+
+        // Update the diagram
+        (window as any).Plotly.restyle(this.plotContainer, {
+            'link.color': [newLinkColors]
+        }, [0]);
+    }
+
+    private resetLinkColors(originalLinkColors: string[]): void {
+        (window as any).Plotly.restyle(this.plotContainer, {
+            'link.color': [originalLinkColors]
+        }, [0]);
     }
 
     private createBarChart(dimensionHeaders: string[]): void {
@@ -302,66 +458,6 @@ class CSVPlotter {
         (window as any).Plotly.newPlot(this.plotContainer, [trace], layout, { responsive: true });
     }
 
-    private createHeatmap(dimensionHeaders: string[]): void {
-        if (dimensionHeaders.length < 2) return;
-
-        const xHeader = dimensionHeaders[0];
-        const yHeader = dimensionHeaders[1];
-
-        // Create a summary heatmap
-        const heatmapData: { [key: string]: { [key: string]: number } } = {};
-        
-        this.csvData.forEach(record => {
-            const xVal = record[xHeader] as string;
-            const yVal = record[yHeader] as string;
-            
-            if (!heatmapData[yVal]) {
-                heatmapData[yVal] = {};
-            }
-            if (!heatmapData[yVal][xVal]) {
-                heatmapData[yVal][xVal] = 0;
-            }
-            heatmapData[yVal][xVal] += record.count;
-        });
-
-        const uniqueX = [...new Set(this.csvData.map(r => r[xHeader] as string))].sort();
-        const uniqueY = [...new Set(this.csvData.map(r => r[yHeader] as string))].sort();
-
-        const z = uniqueY.map(y => 
-            uniqueX.map(x => heatmapData[y]?.[x] || 0)
-        );
-
-        const heatmapTrace = {
-            z: z,
-            x: uniqueX,
-            y: uniqueY,
-            type: 'heatmap',
-            colorscale: 'Viridis',
-            showscale: true,
-            hoverongaps: false
-        };
-
-        const heatmapLayout = {
-            title: {
-                text: `Heatmap: ${yHeader} vs ${xHeader}`,
-                font: { size: 16 }
-            },
-            xaxis: { title: xHeader },
-            yaxis: { title: yHeader },
-            margin: { l: 80, r: 40, b: 60, t: 60 },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)'
-        };
-
-        // Create a second plot container for the heatmap
-        const heatmapContainer = document.createElement('div');
-        heatmapContainer.style.width = '100%';
-        heatmapContainer.style.height = '400px';
-        heatmapContainer.style.marginTop = '20px';
-        
-        this.plotContainer.appendChild(heatmapContainer);
-        (window as any).Plotly.newPlot(heatmapContainer, [heatmapTrace], heatmapLayout, { responsive: true });
-    }
 
     private clearData(): void {
         this.csvData = [];
