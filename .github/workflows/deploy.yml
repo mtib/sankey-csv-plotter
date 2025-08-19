@@ -3,8 +3,18 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'Makefile'
+      - 'styles.css'
+      - 'index.html'
+      - 'app.ts'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'Makefile'
+      - 'styles.css'
+      - 'index.html'
+      - 'app.ts'
 
 permissions:
   contents: read

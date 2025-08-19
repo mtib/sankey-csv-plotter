@@ -1,142 +1,59 @@
-# CSV Data Plotter
+# Interactive Sankey Diagram Visualizer
 
-A static website template for uploading CSV files and generating interactive data visualizations.
+Upload CSV files and explore multi-dimensional data with interactive Sankey diagrams featuring advanced filtering and split-link visualization.
 
 ## Features
 
-- **File Upload**: Upload CSV files with drag-and-drop interface
-- **Data Visualization**: Generates 3D scatter plots and 2D heatmaps
-- **Data Summary**: Shows statistics about your dataset
-- **Responsive Design**: Works on desktop and mobile devices
-- **Interactive Plots**: Powered by Plotly.js for rich interactions
+- **Interactive Sankey Diagrams**: Custom SVG-based visualization with precise control
+- **Advanced Filtering**: Click nodes to select, hover to preview - supports AND/OR logic across dimensions
+- **Split-Link Visualization**: See exact percentages of filtered data with gold/gray sections
+- **Multi-Dimensional Support**: Handle arbitrary number of data dimensions
+- **Real-time Updates**: Instant visual feedback on selection changes
 
 ## CSV Format
 
-The application expects CSV files with the following format:
-```
-<column1>,<column2>,<column3>,<count>
-```
+Upload CSV files with format: `<dim1>,<dim2>,...,<dimN>,<count>`
 
-Where:
-- `column1`, `column2`, `column3` are dimension names (can be any names)
-- `count` is a numeric value representing the count/value for that combination
-- Each row should have a unique combination of the three dimensions
-
-### Example CSV:
+**Example:**
 ```csv
-Region,Product,Category,Sales
-North,Laptop,Electronics,150
-South,Phone,Electronics,120
-East,Monitor,Electronics,65
+Region,Product,Category,Brand,Sales
+North,Laptop,Electronics,Apple,150
+South,Phone,Electronics,Samsung,120
+East,Monitor,Electronics,LG,65
 ```
 
-## Live Demo
+## Quick Start
 
-The application is automatically deployed to GitHub Pages: `https://[username].github.io/sankey-charges`
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (for TypeScript compilation) or any modern web browser
-- A local web server (optional but recommended)
-
-### Building the Project
-
-1. Clone or download this repository
-2. Build the TypeScript code:
-   ```bash
-   make build
-   ```
-
-### Running Locally
-
-To serve the project locally:
 ```bash
+# Build and serve locally
 make serve
+
+# Or just build
+make build
 ```
 
-This will start a local server at `http://localhost:8000`
+Open `http://localhost:8000` in your browser.
 
-### Development
+## How to Use
 
-To watch for changes and auto-rebuild:
-```bash
-make watch
-```
+1. **Upload CSV**: Drag and drop or select your data file
+2. **Explore**: Hover over nodes to preview filtering effects
+3. **Select**: Click nodes to permanently add them to your filter
+4. **Analyze**: Watch split-links show exact percentages of matching data
+5. **Clear**: Double-click anywhere to reset all selections
 
-### Cleaning
+## Filtering Logic
 
-To remove generated files:
-```bash
-make clean
-```
-
-## File Structure
-
-```
-├── index.html          # Main HTML file
-├── styles.css          # CSS styling
-├── app.ts              # TypeScript source code
-├── app.js              # Compiled JavaScript (generated)
-├── sample.csv          # Example CSV file
-├── Makefile            # Build automation
-└── README.md           # This file
-```
-
-## Usage
-
-1. Open `index.html` in your web browser
-2. Click "Choose CSV File" to upload your data
-3. Click "Generate Plot" to create visualizations
-4. Interact with the plots (zoom, rotate, hover for details)
-5. View data summary statistics below the plots
-
-## Visualizations
-
-The application generates two types of plots:
-
-1. **3D Scatter Plot**: Shows all three dimensions with count represented by marker size and color
-2. **2D Heatmap**: Aggregates data showing relationships between the first two dimensions
-
-## Browser Compatibility
-
-- Modern browsers with ES2017 support
-- Chrome 58+
-- Firefox 55+
-- Safari 11+
-- Edge 79+
-
-## Dependencies
-
-- [Plotly.js](https://plotly.com/javascript/) - For interactive plotting (loaded via CDN)
-- TypeScript compiler (for development)
-
-## Customization
-
-You can customize the visualization by modifying the `generatePlot()` method in `app.ts`:
-
-- Change plot types
-- Modify color schemes
-- Adjust marker sizes
-- Add new chart types
+- **Same dimension**: OR logic (North OR South)
+- **Different dimensions**: AND logic (North AND Apple)
+- **Visual feedback**: Gold sections show matching data percentage
 
 ## Deployment
 
-The project automatically deploys to GitHub Pages using GitHub Actions when you push to the `main` branch.
+Automatically deploys to GitHub Pages on push to `main` branch.
 
-### Setup GitHub Pages Deployment
+## Built With
 
-1. Push this repository to GitHub
-2. Go to repository Settings → Pages
-3. Set Source to "GitHub Actions"
-4. Push to `main` branch to trigger deployment
-
-The CI workflow will:
-- Install TypeScript
-- Build the project with `make build`
-- Deploy the static files to GitHub Pages
-
-## License
-
-This is a template project - use it however you'd like!
+- TypeScript + Custom SVG rendering
+- Glassmorphism UI design
+- GitHub Actions CI/CD
