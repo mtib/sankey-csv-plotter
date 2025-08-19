@@ -149,7 +149,7 @@ class CSVPlotter {
         const avgCount = this.csvData.length > 0 ? totalSum / this.csvData.length : 0;
 
         this.totalRecords.textContent = this.csvData.length.toString();
-        this.columnCount.textContent = this.headers.length.toString();
+        this.columnCount.textContent = (this.headers.length - 1).toString(); // Exclude count column
         this.totalCount.textContent = totalSum.toLocaleString();
         this.avgCount.textContent = avgCount.toFixed(2);
         
