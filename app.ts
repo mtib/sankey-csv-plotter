@@ -294,7 +294,7 @@ class CSVPlotter {
     private calculatePositions(nodeData: any, chartWidth: number, chartHeight: number, dimensionHeaders: string[]) {
         const { nodes, links } = nodeData;
         const nodePositions = new Map<number, {x: number, y: number, height: number}>();
-        const linkPositions = new Map<number, {sourceY: number, targetY: number, height: number}>();
+        const linkPositions = new Map<number, {sourceY: number, targetY: number, height: number, sourceHeight: number, targetHeight: number}>();
         
         const nodePadding = 10;
         const columnWidth = chartWidth / Math.max(1, dimensionHeaders.length - 1);
@@ -348,11 +348,32 @@ class CSVPlotter {
             nodeIncomingLinks.get(link.target)!.push(linkIndex);
         });
 
-        // Calculate link positions based on cumulative heights
+        // Calculate link positions with proper flow conservation
+        // Each link's height must be calculated separately for source and target
+        const linkSourceHeights = new Map<number, number>();
+        const linkTargetHeights = new Map<number, number>();
+        
+        // Calculate source heights (proportional to source node)
+        links.forEach((link: any, linkIndex: number) => {
+            const sourceNode = nodes[link.source];
+            const sourcePos = nodePositions.get(link.source)!;
+            const sourceHeight = (link.value / sourceNode.totalValue) * sourcePos.height;
+            linkSourceHeights.set(linkIndex, sourceHeight);
+        });
+        
+        // Calculate target heights (proportional to target node)  
+        links.forEach((link: any, linkIndex: number) => {
+            const targetNode = nodes[link.target];
+            const targetPos = nodePositions.get(link.target)!;
+            const targetHeight = (link.value / targetNode.totalValue) * targetPos.height;
+            linkTargetHeights.set(linkIndex, targetHeight);
+        });
+
+        // Position links within nodes using correct heights
         nodes.forEach((node: any, nodeIndex: number) => {
             const nodePos = nodePositions.get(nodeIndex)!;
             
-            // Sort outgoing links by target position for consistent ordering
+            // Handle outgoing links - use source heights
             const outgoingLinks = nodeOutgoingLinks.get(nodeIndex) || [];
             outgoingLinks.sort((a, b) => {
                 const targetA = nodePositions.get(links[a].target)!.y;
@@ -360,22 +381,24 @@ class CSVPlotter {
                 return targetA - targetB;
             });
             
-            // Calculate source positions for outgoing links
             let currentSourceY = nodePos.y;
             outgoingLinks.forEach(linkIndex => {
-                const link = links[linkIndex];
-                const linkHeight = (link.value / node.totalValue) * nodePos.height;
+                const sourceHeight = linkSourceHeights.get(linkIndex)!;
+                const targetHeight = linkTargetHeights.get(linkIndex)!;
                 
-                if (!linkPositions.has(linkIndex)) {
-                    linkPositions.set(linkIndex, {sourceY: 0, targetY: 0, height: linkHeight});
-                }
-                linkPositions.get(linkIndex)!.sourceY = currentSourceY;
-                linkPositions.get(linkIndex)!.height = linkHeight;
+                // Store both source and target positions
+                linkPositions.set(linkIndex, {
+                    sourceY: currentSourceY,
+                    targetY: 0, // Will be set when processing target node
+                    height: sourceHeight, // This will be used for source side
+                    sourceHeight: sourceHeight,
+                    targetHeight: targetHeight
+                });
                 
-                currentSourceY += linkHeight;
+                currentSourceY += sourceHeight;
             });
             
-            // Sort incoming links by source position for consistent ordering
+            // Handle incoming links - use target heights
             const incomingLinks = nodeIncomingLinks.get(nodeIndex) || [];
             incomingLinks.sort((a, b) => {
                 const sourceA = nodePositions.get(links[a].source)!.y;
@@ -383,18 +406,25 @@ class CSVPlotter {
                 return sourceA - sourceB;
             });
             
-            // Calculate target positions for incoming links
             let currentTargetY = nodePos.y;
             incomingLinks.forEach(linkIndex => {
-                const link = links[linkIndex];
-                const linkHeight = (link.value / node.totalValue) * nodePos.height;
+                const targetHeight = linkTargetHeights.get(linkIndex)!;
+                const linkData = linkPositions.get(linkIndex);
                 
-                if (!linkPositions.has(linkIndex)) {
-                    linkPositions.set(linkIndex, {sourceY: 0, targetY: 0, height: linkHeight});
+                if (linkData) {
+                    linkData.targetY = currentTargetY;
+                } else {
+                    // This shouldn't happen, but just in case
+                    linkPositions.set(linkIndex, {
+                        sourceY: 0,
+                        targetY: currentTargetY,
+                        height: targetHeight,
+                        sourceHeight: targetHeight,
+                        targetHeight: targetHeight
+                    });
                 }
-                linkPositions.get(linkIndex)!.targetY = currentTargetY;
                 
-                currentTargetY += linkHeight;
+                currentTargetY += targetHeight;
             });
         });
 
@@ -467,9 +497,9 @@ class CSVPlotter {
             const sourceX = sourcePos.x + 30; // Right edge of source node
             const targetX = targetPos.x; // Left edge of target node
             const sourceY1 = linkPos.sourceY;
-            const sourceY2 = linkPos.sourceY + linkPos.height;
+            const sourceY2 = linkPos.sourceY + linkPos.sourceHeight;
             const targetY1 = linkPos.targetY;
-            const targetY2 = linkPos.targetY + linkPos.height;
+            const targetY2 = linkPos.targetY + linkPos.targetHeight;
             
             const pathData = `M ${sourceX} ${sourceY1} 
                              L ${targetX} ${targetY1}
@@ -531,8 +561,9 @@ class CSVPlotter {
             if (coords) {
                 linkPositions.set(index, {
                     sourceY: coords.sourceY1,
-                    targetY: coords.targetY1, 
-                    height: coords.sourceY2 - coords.sourceY1
+                    targetY: coords.targetY1,
+                    sourceHeight: coords.sourceY2 - coords.sourceY1,
+                    targetHeight: coords.targetY2 - coords.targetY1
                 });
             }
         });
@@ -572,11 +603,9 @@ class CSVPlotter {
         const sourceX = sourcePos.x + 30;
         const targetX = targetPos.x;
         const sourceY1 = linkPos.sourceY;
-        const sourceY2 = linkPos.sourceY + linkPos.height;
+        const sourceY2 = linkPos.sourceY + linkPos.sourceHeight;
         const targetY1 = linkPos.targetY;
-        const targetY2 = linkPos.targetY + linkPos.height;
-        
-        // Split the trapezoid based on proportion
+        const targetY2 = linkPos.targetY + linkPos.targetHeight;
         
         // Clear existing path and create two paths
         pathElement.setAttribute('fill', 'none');
