@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Data Plotter</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CSV Data Plotter</h1>
+            <p>Upload a CSV file with format: &lt;column1&gt;,&lt;column2&gt;,&lt;...&gt;,&lt;count&gt;</p>
+        </header>
+        
+        <main>
+            <section class="upload-section">
+                <div class="file-upload-wrapper">
+                    <input type="file" id="csvFile" accept=".csv" class="file-input">
+                    <label for="csvFile" class="file-upload-label">
+                        <span class="upload-icon">📁</span>
+                        <span class="upload-text">Choose CSV File</span>
+                    </label>
+                </div>
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <span class="file-name" id="fileName"></span>
+                    <span class="file-size" id="fileSize"></span>
+                </div>
+            </section>
+            
+            <section class="controls-section">
+                <button id="processBtn" class="process-btn" disabled>Generate Plot</button>
+                <button id="clearBtn" class="clear-btn" style="display: none;">Clear Data</button>
+            </section>
+            
+            <section class="plot-section">
+                <div id="plotContainer" class="plot-container">
+                    <div class="placeholder">
+                        <p>Upload a CSV file to generate a plot</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="data-summary" id="dataSummary" style="display: none;">
+                <h3>Data Summary</h3>
+                <div class="summary-stats">
+                    <div class="stat">
+                        <label>Total Records:</label>
+                        <span id="totalRecords">0</span>
+                    </div>
+                    <div class="stat">
+                        <label>Columns:</label>
+                        <span id="columnCount">0</span>
+                    </div>
+                    <div class="stat">
+                        <label>Total Count:</label>
+                        <span id="totalCount">0</span>
+                    </div>
+                    <div class="stat">
+                        <label>Average Count:</label>
+                        <span id="avgCount">0</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Supports CSV files with multiple named columns and count values</p>
+        </footer>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
