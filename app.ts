@@ -19,6 +19,7 @@ class CSVPlotter {
     
     private csvData: CSVRecord[] = [];
     private headers: string[] = [];
+    private selectedNodes: Set<number> = new Set();
 
     constructor() {
         this.initializeElements();
@@ -203,6 +204,11 @@ class CSVPlotter {
 
         // Add title
         this.addTitle(svg, width);
+        
+        // Add double-click to clear all selections
+        svg.addEventListener('dblclick', () => {
+            this.clearAllSelections(g);
+        });
     }
 
     private prepareSankeyData(dimensionHeaders: string[]) {
@@ -470,13 +476,20 @@ class CSVPlotter {
             nodeGroup.appendChild(text);
             g.appendChild(nodeGroup);
 
-            // Add hover events
+            // Add hover and click events
             nodeGroup.addEventListener('mouseenter', () => {
-                this.handleCustomNodeHover(index, nodeData, nodePositions, g);
+                this.handleNodeHover(index, rect, text);
+                this.updateLinkHighlights(nodeData, nodePositions, g);
             });
             
             nodeGroup.addEventListener('mouseleave', () => {
-                this.resetCustomLinkColors(g);
+                this.handleNodeUnhover(index, rect, text);
+            });
+            
+            nodeGroup.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleNodeSelection(index, rect, text);
+                this.updateLinkHighlights(nodeData, nodePositions, g);
             });
         });
     }
@@ -517,9 +530,51 @@ class CSVPlotter {
         });
     }
 
-    private handleCustomNodeHover(hoveredNodeIndex: number, nodeData: any, nodePositions: Map<number, any>, g: SVGGElement) {
+    private handleNodeHover(nodeIndex: number, rect: SVGRectElement, text: SVGTextElement) {
+        if (!this.selectedNodes.has(nodeIndex)) {
+            text.setAttribute('font-weight', 'bold');
+            rect.setAttribute('stroke-width', '3');
+        }
+    }
+    
+    private handleNodeUnhover(nodeIndex: number, rect: SVGRectElement, text: SVGTextElement) {
+        if (!this.selectedNodes.has(nodeIndex)) {
+            text.setAttribute('font-weight', 'normal');
+            rect.setAttribute('stroke-width', '1');
+        }
+    }
+    
+    private toggleNodeSelection(nodeIndex: number, rect: SVGRectElement, text: SVGTextElement) {
+        if (this.selectedNodes.has(nodeIndex)) {
+            this.selectedNodes.delete(nodeIndex);
+            text.setAttribute('font-weight', 'normal');
+            rect.setAttribute('stroke-width', '1');
+        } else {
+            this.selectedNodes.add(nodeIndex);
+            text.setAttribute('font-weight', 'bold');
+            rect.setAttribute('stroke-width', '3');
+        }
+    }
+    
+    private updateLinkHighlights(nodeData: any, nodePositions: Map<number, any>, g: SVGGElement) {
+        // Always reset first to clear any existing overlays
+        this.resetCustomLinkColors(g);
+        
+        if (this.selectedNodes.size === 0) {
+            return;
+        }
+        
         const { nodes, links } = nodeData;
-        const hoveredNode = nodes[hoveredNodeIndex];
+        const selectedNodeData = Array.from(this.selectedNodes).map(index => nodes[index]);
+        
+        // Group selected nodes by dimension for OR logic within dimensions
+        const selectedByDimension = new Map<string, string[]>();
+        selectedNodeData.forEach(node => {
+            if (!selectedByDimension.has(node.header)) {
+                selectedByDimension.set(node.header, []);
+            }
+            selectedByDimension.get(node.header)!.push(node.value);
+        });
         
         // Get link positions from the stored data
         const linkPositions = this.getStoredLinkPositions(g);
@@ -528,15 +583,35 @@ class CSVPlotter {
         const linkProportions = new Map<number, number>();
         
         links.forEach((link: any, linkIndex: number) => {
-            const recordsWithHoveredValue = link.records.filter((record: CSVRecord) => 
-                record[hoveredNode.header] === hoveredNode.value
-            );
-            const proportion = recordsWithHoveredValue.length > 0 ? 
-                recordsWithHoveredValue.reduce((sum: number, r: CSVRecord) => sum + r.count, 0) / link.value : 0;
+            // Get the source and target headers for this specific link
+            const sourceNode = nodes[link.source];
+            const targetNode = nodes[link.target];
+            const sourceHeader = sourceNode.header;
+            const targetHeader = targetNode.header;
+            const sourceValue = sourceNode.value;
+            const targetValue = targetNode.value;
+            
+            // Filter original CSV data with AND/OR logic
+            const matchingRecords = this.csvData.filter((record: CSVRecord) => {
+                // Must match this link's source and target values
+                const matchesLink = record[sourceHeader] === sourceValue && record[targetHeader] === targetValue;
+                if (!matchesLink) return false;
+                
+                // Apply AND/OR logic for selected criteria
+                const matchesSelection = Array.from(selectedByDimension.entries()).every(([header, values]) => {
+                    // OR within dimension: record must match at least one value in this dimension
+                    return values.includes(record[header] as string);
+                });
+                
+                return matchesSelection;
+            });
+            
+            const matchingCount = matchingRecords.reduce((sum, record) => sum + record.count, 0);
+            const proportion = matchingCount > 0 ? matchingCount / link.value : 0;
             linkProportions.set(linkIndex, proportion);
         });
-
-        // Update link visuals
+        
+        // Update link visuals with split-link visualization
         const linkElements = g.querySelectorAll('.link');
         linkElements.forEach((linkElement, index) => {
             const proportion = linkProportions.get(index) || 0;
@@ -545,9 +620,30 @@ class CSVPlotter {
                 this.drawSplitLink(linkElement as SVGPathElement, links[index], nodePositions, linkPositions, proportion, index);
             } else {
                 (linkElement as SVGPathElement).setAttribute('fill', 'rgba(200, 200, 200, 0.2)');
+                (linkElement as SVGPathElement).setAttribute('stroke', 'rgba(200, 200, 200, 0.4)');
+                (linkElement as SVGPathElement).setAttribute('stroke-width', '0.5');
             }
         });
     }
+    
+    private clearAllSelections(g: SVGGElement) {
+        this.selectedNodes.clear();
+        
+        // Reset all node visual states
+        const nodeGroups = g.querySelectorAll('.node');
+        nodeGroups.forEach(nodeGroup => {
+            const rect = nodeGroup.querySelector('rect') as SVGRectElement;
+            const text = nodeGroup.querySelector('text') as SVGTextElement;
+            if (rect && text) {
+                text.setAttribute('font-weight', 'normal');
+                rect.setAttribute('stroke-width', '1');
+            }
+        });
+        
+        // Reset link colors
+        this.resetCustomLinkColors(g);
+    }
+
 
     private getStoredLinkPositions(g: SVGGElement): Map<number, any> {
         // This would ideally be stored from calculatePositions, but for now we'll recalculate
@@ -652,10 +748,13 @@ class CSVPlotter {
         const splitLinks = g.querySelectorAll('.split-link-gold, .split-link-gray');
         splitLinks.forEach(element => element.remove());
         
-        // Reset original links
+        // Reset original links completely
         const linkElements = g.querySelectorAll('.link');
         linkElements.forEach(linkElement => {
-            (linkElement as SVGPathElement).setAttribute('fill', 'rgba(150, 150, 150, 0.6)');
+            const pathElement = linkElement as SVGPathElement;
+            pathElement.setAttribute('fill', 'rgba(150, 150, 150, 0.6)');
+            pathElement.setAttribute('stroke', 'rgba(150, 150, 150, 0.8)');
+            pathElement.setAttribute('stroke-width', '0.5');
         });
     }
 
@@ -667,7 +766,7 @@ class CSVPlotter {
         title.setAttribute('font-size', '18');
         title.setAttribute('font-weight', 'bold');
         title.setAttribute('font-family', 'Arial, sans-serif');
-        title.textContent = 'Custom Sankey Diagram with Split Links';
+        title.textContent = 'Interactive Sankey Diagram - Click to select nodes, double-click to clear';
         svg.appendChild(title);
     }
 
@@ -718,6 +817,7 @@ class CSVPlotter {
     private clearData(): void {
         this.csvData = [];
         this.headers = [];
+        this.selectedNodes.clear();
         this.fileInput.value = '';
         this.fileInfo.style.display = 'none';
         this.dataSummary.style.display = 'none';
