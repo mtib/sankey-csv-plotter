@@ -30,6 +30,10 @@ South,Phone,Electronics,120
 East,Monitor,Electronics,65
 ```
 
+## Live Demo
+
+The application is automatically deployed to GitHub Pages: `https://[username].github.io/sankey-charges`
+
 ## Getting Started
 
 ### Prerequisites
@@ -116,6 +120,22 @@ You can customize the visualization by modifying the `generatePlot()` method in 
 - Modify color schemes
 - Adjust marker sizes
 - Add new chart types
+
+## Deployment
+
+The project automatically deploys to GitHub Pages using GitHub Actions when you push to the `main` branch.
+
+### Setup GitHub Pages Deployment
+
+1. Push this repository to GitHub
+2. Go to repository Settings → Pages
+3. Set Source to "GitHub Actions"
+4. Push to `main` branch to trigger deployment
+
+The CI workflow will:
+- Install TypeScript
+- Build the project with `make build`
+- Deploy the static files to GitHub Pages
 
 ## License
 
