@@ -19,18 +19,6 @@
     --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
 }
 
-[data-theme="dark"] {
-    --text-color: #ffffff;
-    --svg-text-color: #ffffff;
-    --svg-stroke-color: #ffffff;
-    --primary-color: #9fb3f3;
-    --secondary-color: #a0a8c7;
-    --bg-color: #1a1a1a;
-    --bg-gradient: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-    --glass-bg: rgba(45, 55, 72, 0.95);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -270,7 +258,23 @@ main {
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
+.plot-section {
+    position: relative;
+}
+
 .fullscreen-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 50px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
     background: linear-gradient(135deg, #6f42c1 0%, #007bff 100%);
     color: white;
 }
@@ -294,6 +298,10 @@ main {
     height: 600px;
     border-radius: 10px;
     overflow: hidden;
+}
+
+.plot-container svg {
+    background: var(--svg-bg-color);
 }
 
 .placeholder {
@@ -369,6 +377,26 @@ main {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+body[data-theme="dark"] {
+    --text-color: #ffffff;
+    --svg-text-color: #ffffff;
+    --svg-stroke-color: #ffffff;
+    --primary-color: #9fb3f3;
+    --secondary-color: #a0a8c7;
+    --bg-color: #1a1a1a;
+    --bg-gradient: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+    --glass-bg: rgba(45, 55, 72, 0.95);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --node-default-color: #A0AEC0;
+    --svg-bg-color: rgba(45, 55, 72, 0.95);
+    --link-fill-color: rgba(200, 200, 200, 0.2);
+    --link-stroke-color: rgba(200, 200, 200, 0.4);
+    --split-link-gray-fill-color: rgba(128, 128, 128, 0.4);
+    --split-link-gray-stroke-color: rgba(128, 128, 128, 0.6);
+}
+
+
 footer {
     text-align: center;
     margin-top: 40px;
@@ -421,4 +449,8 @@ footer {
     max-width: 100%;
     max-height: 100%;
     background: rgba(255, 255, 255, 0.95) !important;
+}
+
+body[data-theme="dark"] .plot-container:fullscreen svg {
+    background: rgba(45, 55, 72, 0.95) !important;
 }

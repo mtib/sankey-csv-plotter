@@ -5,8 +5,6 @@ interface CSVRecord {
 
 class CSVPlotter {
     private fileInput: HTMLInputElement;
-    private processBtn: HTMLButtonElement;
-    private clearBtn: HTMLButtonElement;
     private fullscreenBtn: HTMLButtonElement;
     private themeToggle: HTMLButtonElement;
     private highlightColorSelect: HTMLSelectElement;
@@ -36,8 +34,6 @@ class CSVPlotter {
 
     private initializeElements(): void {
         this.fileInput = document.getElementById('csvFile') as HTMLInputElement;
-        this.processBtn = document.getElementById('processBtn') as HTMLButtonElement;
-        this.clearBtn = document.getElementById('clearBtn') as HTMLButtonElement;
         this.fullscreenBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
         this.themeToggle = document.getElementById('themeToggle') as HTMLButtonElement;
         this.highlightColorSelect = document.getElementById('highlightColor') as HTMLSelectElement;
@@ -54,8 +50,6 @@ class CSVPlotter {
 
     private attachEventListeners(): void {
         this.fileInput.addEventListener('change', this.handleFileSelect.bind(this));
-        this.processBtn.addEventListener('click', this.processCSV.bind(this));
-        this.clearBtn.addEventListener('click', this.clearData.bind(this));
         this.fullscreenBtn.addEventListener('click', this.toggleFullscreen.bind(this));
         this.themeToggle.addEventListener('click', this.toggleTheme.bind(this));
         this.highlightColorSelect.addEventListener('change', this.updateHighlightColor.bind(this));
@@ -154,6 +148,19 @@ class CSVPlotter {
         return nodePositions;
     }
 
+    private getThemeColors() {
+        const isDark = document.body.hasAttribute('data-theme');
+        return {
+            textColor: isDark ? '#ffffff' : '#333',
+            strokeColor: isDark ? '#ffffff' : '#333',
+            defaultColor: isDark ? '#A0AEC0' : '#808080',
+            linkFillColor: isDark ? 'rgba(200, 200, 200, 0.2)' : 'rgba(150, 150, 150, 0.6)',
+            linkStrokeColor: isDark ? 'rgba(200, 200, 200, 0.4)' : 'rgba(150, 150, 150, 0.8)',
+            grayFillColor: isDark ? 'rgba(128, 128, 128, 0.4)' : 'rgba(128, 128, 128, 0.4)',
+            grayStrokeColor: isDark ? 'rgba(128, 128, 128, 0.6)' : 'rgba(128, 128, 128, 0.6)'
+        };
+    }
+
     private refreshDiagramTheme(): void {
         const svg = this.plotContainer.querySelector('svg');
         if (!svg) return;
@@ -161,31 +168,38 @@ class CSVPlotter {
         const g = svg.querySelector('g');
         if (!g) return;
         
+        const colors = this.getThemeColors();
+        
         // Update all text colors
         const textElements = g.querySelectorAll('text');
-        const textColor = getComputedStyle(document.documentElement).getPropertyValue('--svg-text-color').trim() || '#333';
         textElements.forEach(text => {
-            text.setAttribute('fill', textColor);
+            text.setAttribute('fill', colors.textColor);
         });
         
         // Update all node stroke colors
         const rectElements = g.querySelectorAll('.node rect');
-        const strokeColor = getComputedStyle(document.documentElement).getPropertyValue('--svg-stroke-color').trim() || '#333';
-        const defaultColor = getComputedStyle(document.documentElement).getPropertyValue('--node-default-color').trim() || '#808080';
         
         rectElements.forEach((rect, index) => {
-            rect.setAttribute('stroke', strokeColor);
+            rect.setAttribute('stroke', colors.strokeColor);
             // Only update fill color for non-selected nodes
             if (!this.selectedNodes.has(index) && !this.clickedNodes.has(index)) {
-                rect.setAttribute('fill', defaultColor);
+                rect.setAttribute('fill', colors.defaultColor);
             }
         });
         
-        // Update title color
-        const titleElement = svg.querySelector('text');
-        if (titleElement) {
-            titleElement.setAttribute('fill', textColor);
-        }
+        // Update all link colors
+        const linkElements = g.querySelectorAll('.link path');
+        linkElements.forEach(link => {
+            link.setAttribute('fill', colors.linkFillColor);
+            link.setAttribute('stroke', colors.linkStrokeColor);
+        });
+        
+        // Update split link colors
+        const grayLinks = g.querySelectorAll('.split-link-gray');
+        grayLinks.forEach(link => {
+            link.setAttribute('fill', colors.grayFillColor);
+            link.setAttribute('stroke', colors.grayStrokeColor);
+        });
     }
 
     private hexToRgba(hex: string, alpha: number): string {
@@ -208,10 +222,10 @@ class CSVPlotter {
             this.fileName.textContent = file.name;
             this.fileSize.textContent = this.formatFileSize(file.size);
             this.fileInfo.style.display = 'block';
-            this.processBtn.disabled = false;
+            // Auto-process the CSV when file is selected
+            this.processCSV();
         } else {
             this.fileInfo.style.display = 'none';
-            this.processBtn.disabled = true;
         }
     }
 
@@ -232,7 +246,7 @@ class CSVPlotter {
             this.csvData = this.parseCSV(text);
             this.updateDataSummary();
             this.generatePlot();
-            this.clearBtn.style.display = 'inline-block';
+            // No clear button needed - auto-processing
             this.fullscreenBtn.style.display = 'inline-block';
         } catch (error) {
             console.error('Error processing CSV:', error);
@@ -325,7 +339,6 @@ class CSVPlotter {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.style.width = '100%';
         svg.style.height = '600px';
-        svg.style.background = 'rgba(255, 255, 255, 0.9)';
         svg.style.borderRadius = '15px';
         svg.setAttribute('viewBox', '0 0 800 600');
         svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -334,7 +347,7 @@ class CSVPlotter {
         // Fixed dimensions for consistent layout
         const width = 800;
         const height = 600;
-        const margin = { top: 60, right: 120, bottom: 40, left: 60 }; // Increased right margin for labels
+        const margin = { top: 10, right: 0, bottom: 20, left: 0 }; // Small padding to prevent cutoff
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
 
@@ -355,9 +368,6 @@ class CSVPlotter {
         // Draw nodes
         this.drawNodes(g, nodeData, nodePositions);
 
-        // Add title
-        this.addTitle(svg, width);
-        
         // Add double-click to clear all selections
         svg.addEventListener('dblclick', () => {
             this.clearAllSelections(g);
@@ -473,7 +483,7 @@ class CSVPlotter {
         const linkPositions = new Map<number, {sourceY: number, targetY: number, height: number, sourceHeight: number, targetHeight: number}>();
         
         const nodePadding = 10;
-        const columnWidth = chartWidth / Math.max(1, dimensionHeaders.length - 1);
+        const columnWidth = chartWidth / Math.max(1, dimensionHeaders.length);
         
         // Group nodes by dimension
         const nodesByDim = new Map<number, number[]>();
@@ -609,8 +619,7 @@ class CSVPlotter {
 
     private drawNodes(g: SVGGElement, nodeData: any, nodePositions: Map<number, any>) {
         const { nodes } = nodeData;
-        // Use grey as default color for all nodes
-        const defaultColor = getComputedStyle(document.documentElement).getPropertyValue('--node-default-color').trim() || '#808080';
+        const colors = this.getThemeColors();
 
         nodes.forEach((node: any, index: number) => {
             const pos = nodePositions.get(index);
@@ -626,9 +635,8 @@ class CSVPlotter {
             rect.setAttribute('y', pos.y.toString());
             rect.setAttribute('width', '30');
             rect.setAttribute('height', pos.height.toString());
-            rect.setAttribute('fill', defaultColor);
-            const strokeColor = getComputedStyle(document.documentElement).getPropertyValue('--svg-stroke-color').trim() || '#333';
-            rect.setAttribute('stroke', strokeColor);
+            rect.setAttribute('fill', colors.defaultColor);
+            rect.setAttribute('stroke', colors.strokeColor);
             rect.setAttribute('stroke-width', '0.5'); // Thinner border when not selected
             rect.setAttribute('rx', '2'); // Reduced border rounding
             rect.style.cursor = 'pointer';
@@ -640,8 +648,7 @@ class CSVPlotter {
             text.setAttribute('dy', '0.35em');
             text.setAttribute('font-size', '12');
             text.setAttribute('font-family', 'Arial, sans-serif');
-            const textColor = getComputedStyle(document.documentElement).getPropertyValue('--svg-text-color').trim() || '#333';
-            text.setAttribute('fill', textColor);
+            text.setAttribute('fill', colors.textColor);
             text.textContent = node.label;
             
             nodeGroup.appendChild(rect);
@@ -668,6 +675,7 @@ class CSVPlotter {
 
     private drawLinks(g: SVGGElement, nodeData: any, nodePositions: Map<number, any>, linkPositions: Map<number, any>) {
         const { links } = nodeData;
+        const colors = this.getThemeColors();
 
         links.forEach((link: any, linkIndex: number) => {
             const sourcePos = nodePositions.get(link.source);
@@ -692,8 +700,8 @@ class CSVPlotter {
                              L ${sourceX} ${sourceY2} Z`;
             
             path.setAttribute('d', pathData);
-            path.setAttribute('fill', 'rgba(150, 150, 150, 0.6)');
-            path.setAttribute('stroke', 'rgba(150, 150, 150, 0.8)');
+            path.setAttribute('fill', colors.linkFillColor);
+            path.setAttribute('stroke', colors.linkStrokeColor);
             path.setAttribute('stroke-width', '0.5');
             path.setAttribute('class', 'link');
             path.setAttribute('data-link-index', linkIndex.toString());
@@ -718,8 +726,8 @@ class CSVPlotter {
             this.selectedNodes.delete(nodeIndex);
             text.setAttribute('font-weight', 'normal');
             rect.setAttribute('stroke-width', '0.5'); // Thinner border when unselected
-            const defaultColor = getComputedStyle(document.documentElement).getPropertyValue('--node-default-color').trim() || '#808080';
-            rect.setAttribute('fill', defaultColor);
+            const colors = this.getThemeColors();
+            rect.setAttribute('fill', colors.defaultColor);
             
             // Update link highlights after removing the node from selection
             const parentG = rect.closest('g')?.parentElement;
@@ -736,8 +744,8 @@ class CSVPlotter {
             this.selectedNodes.delete(nodeIndex);
             text.setAttribute('font-weight', 'normal');
             rect.setAttribute('stroke-width', '0.5'); // Thinner border when unselected
-            const defaultColor = getComputedStyle(document.documentElement).getPropertyValue('--node-default-color').trim() || '#808080';
-            rect.setAttribute('fill', defaultColor);
+            const colors = this.getThemeColors();
+            rect.setAttribute('fill', colors.defaultColor);
         } else {
             // Not clicked before - add to clicked (and ensure it's selected)
             this.clickedNodes.add(nodeIndex);
@@ -757,6 +765,7 @@ class CSVPlotter {
         }
         
         const { nodes, links } = nodeData;
+        const colors = this.getThemeColors();
         const selectedNodeData = Array.from(this.selectedNodes).map(index => nodes[index]);
         
         // Group selected nodes by dimension for OR logic within dimensions
@@ -811,8 +820,8 @@ class CSVPlotter {
             if (proportion > 0) {
                 this.drawSplitLink(linkElement as SVGPathElement, links[index], nodePositions, linkPositions, proportion, index);
             } else {
-                (linkElement as SVGPathElement).setAttribute('fill', 'rgba(200, 200, 200, 0.2)');
-                (linkElement as SVGPathElement).setAttribute('stroke', 'rgba(200, 200, 200, 0.4)');
+                (linkElement as SVGPathElement).setAttribute('fill', colors.linkFillColor);
+                (linkElement as SVGPathElement).setAttribute('stroke', colors.linkStrokeColor);
                 (linkElement as SVGPathElement).setAttribute('stroke-width', '0.5');
             }
         });
@@ -824,14 +833,14 @@ class CSVPlotter {
         
         // Reset all node visual states
         const nodeGroups = g.querySelectorAll('.node');
-        const defaultColor = getComputedStyle(document.documentElement).getPropertyValue('--node-default-color').trim() || '#808080';
+        const colors = this.getThemeColors();
         nodeGroups.forEach(nodeGroup => {
             const rect = nodeGroup.querySelector('rect') as SVGRectElement;
             const text = nodeGroup.querySelector('text') as SVGTextElement;
             if (rect && text) {
                 text.setAttribute('font-weight', 'normal');
                 rect.setAttribute('stroke-width', '0.5'); // Thinner border when unselected
-                rect.setAttribute('fill', defaultColor);
+                rect.setAttribute('fill', colors.defaultColor);
             }
         });
         
@@ -885,6 +894,7 @@ class CSVPlotter {
         proportion: number, 
         linkIndex: number
     ) {
+        const colors = this.getThemeColors();
         const sourcePos = nodePositions.get(link.source);
         const targetPos = nodePositions.get(link.target);
         const linkPos = linkPositions.get(linkIndex);
@@ -928,8 +938,8 @@ class CSVPlotter {
                                   L ${targetX} ${targetY2}
                                   L ${sourceX} ${sourceY2} Z`;
             grayPath.setAttribute('d', grayPathData);
-            grayPath.setAttribute('fill', 'rgba(128, 128, 128, 0.4)');
-            grayPath.setAttribute('stroke', 'rgba(128, 128, 128, 0.6)');
+            grayPath.setAttribute('fill', colors.grayFillColor);
+            grayPath.setAttribute('stroke', colors.grayStrokeColor);
             grayPath.setAttribute('stroke-width', '0.5');
             grayPath.setAttribute('class', 'split-link-gray');
             
@@ -942,6 +952,7 @@ class CSVPlotter {
     }
 
     private resetCustomLinkColors(g: SVGGElement) {
+        const colors = this.getThemeColors();
         // Remove split links
         const splitLinks = g.querySelectorAll('.split-link-gold, .split-link-gray');
         splitLinks.forEach(element => element.remove());
@@ -950,25 +961,12 @@ class CSVPlotter {
         const linkElements = g.querySelectorAll('.link');
         linkElements.forEach(linkElement => {
             const pathElement = linkElement as SVGPathElement;
-            pathElement.setAttribute('fill', 'rgba(150, 150, 150, 0.6)');
-            pathElement.setAttribute('stroke', 'rgba(150, 150, 150, 0.8)');
+            pathElement.setAttribute('fill', colors.linkFillColor);
+            pathElement.setAttribute('stroke', colors.linkStrokeColor);
             pathElement.setAttribute('stroke-width', '0.5');
         });
     }
 
-    private addTitle(svg: SVGElement, width: number) {
-        const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        title.setAttribute('x', (width / 2).toString());
-        title.setAttribute('y', '25');
-        title.setAttribute('text-anchor', 'middle');
-        title.setAttribute('font-size', '18');
-        title.setAttribute('font-weight', 'bold');
-        title.setAttribute('font-family', 'Arial, sans-serif');
-        const textColor = getComputedStyle(document.documentElement).getPropertyValue('--svg-text-color').trim() || '#333';
-        title.setAttribute('fill', textColor);
-        title.textContent = 'Interactive Sankey Diagram - Click to select nodes, double-click to clear';
-        svg.appendChild(title);
-    }
 
     private createBarChart(dimensionHeaders: string[]): void {
         const header = dimensionHeaders[0];
@@ -1014,25 +1012,6 @@ class CSVPlotter {
     }
 
 
-    private clearData(): void {
-        this.csvData = [];
-        this.headers = [];
-        this.selectedNodes.clear();
-        this.clickedNodes.clear();
-        this.fileInput.value = '';
-        this.fileInfo.style.display = 'none';
-        this.dataSummary.style.display = 'none';
-        this.processBtn.disabled = true;
-        this.clearBtn.style.display = 'none';
-        this.fullscreenBtn.style.display = 'none';
-        
-        // Reset plot container
-        this.plotContainer.innerHTML = `
-            <div class="placeholder">
-                <p>Upload a CSV file to generate a plot</p>
-            </div>
-        `;
-    }
 
     private toggleFullscreen(): void {
         if (!document.fullscreenElement) {
@@ -1104,10 +1083,9 @@ class CSVPlotter {
             svg.removeChild(svg.firstChild);
         }
 
-        // Use larger margins for fullscreen to accommodate longer labels
-        const isFullscreen = !!document.fullscreenElement;
-        const rightMargin = isFullscreen ? 200 : 120; // Extra space in fullscreen
-        const margin = { top: 60, right: rightMargin, bottom: 40, left: 60 };
+        // Add padding in fullscreen mode
+        const padding = 40;
+        const margin = { top: padding, right: padding, bottom: padding, left: padding };
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
 
@@ -1128,9 +1106,6 @@ class CSVPlotter {
         // Draw nodes
         this.drawNodes(g, nodeData, nodePositions);
 
-        // Add title
-        this.addTitle(svg, width);
-        
         // Add double-click to clear all selections
         svg.addEventListener('dblclick', () => {
             this.clearAllSelections(g);
