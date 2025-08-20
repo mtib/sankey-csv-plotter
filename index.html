@@ -10,6 +10,22 @@
 <body>
     <div class="container">
         <header>
+            <div class="header-controls">
+                <div class="theme-controls">
+                    <button id="themeToggle" class="theme-toggle" title="Toggle dark mode">🌙</button>
+                    <div class="color-selector">
+                        <label for="highlightColor" class="color-label">Highlight:</label>
+                        <select id="highlightColor" class="color-dropdown">
+                            <option value="#FFD700" selected>Gold</option>
+                            <option value="#000000">Black</option>
+                            <option value="#FF0000">Red</option>
+                            <option value="#00FF00">Green</option>
+                            <option value="#0000FF">Blue</option>
+                            <option value="#FF69B4">Pink</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
             <h1>CSV Data Plotter</h1>
             <p>Upload a CSV file with format: &lt;column1&gt;,&lt;column2&gt;,&lt;...&gt;,&lt;count&gt;</p>
         </header>
