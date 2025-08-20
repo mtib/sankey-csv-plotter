@@ -26,6 +26,7 @@ class CSVPlotter {
     constructor() {
         this.initializeElements();
         this.attachEventListeners();
+        this.setupFullscreenListener();
     }
 
     private initializeElements(): void {
@@ -49,6 +50,16 @@ class CSVPlotter {
         this.processBtn.addEventListener('click', this.processCSV.bind(this));
         this.clearBtn.addEventListener('click', this.clearData.bind(this));
         this.fullscreenBtn.addEventListener('click', this.toggleFullscreen.bind(this));
+    }
+
+    private setupFullscreenListener(): void {
+        // Listen for fullscreen changes (including ESC key exits)
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                // Exited fullscreen - restore normal layout
+                setTimeout(() => this.relayoutForNormal(), 100);
+            }
+        });
     }
 
     private handleFileSelect(event: Event): void {
@@ -186,7 +197,7 @@ class CSVPlotter {
         // Fixed dimensions for consistent layout
         const width = 800;
         const height = 600;
-        const margin = { top: 60, right: 60, bottom: 40, left: 60 };
+        const margin = { top: 60, right: 120, bottom: 40, left: 60 }; // Increased right margin for labels
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
 
@@ -205,7 +216,7 @@ class CSVPlotter {
         this.drawLinks(g, nodeData, nodePositions, linkPositions);
         
         // Draw nodes
-        this.drawNodes(g, nodeData, nodePositions, dimensionHeaders);
+        this.drawNodes(g, nodeData, nodePositions);
 
         // Add title
         this.addTitle(svg, width);
@@ -228,6 +239,20 @@ class CSVPlotter {
         
         const nodeMap = new Map<string, number>();
         
+        // First, collect all values to detect collisions
+        const allValues = new Set<string>();
+        const valueCollisions = new Set<string>();
+        
+        dimensionHeaders.forEach(header => {
+            const uniqueValues = [...new Set(this.csvData.map(r => r[header] as string))];
+            uniqueValues.forEach(value => {
+                if (allValues.has(value)) {
+                    valueCollisions.add(value);
+                }
+                allValues.add(value);
+            });
+        });
+        
         // Create nodes for each unique value in each dimension
         dimensionHeaders.forEach((header, dimIndex) => {
             const uniqueValues = [...new Set(this.csvData.map(r => r[header] as string))];
@@ -237,11 +262,14 @@ class CSVPlotter {
                     .filter(r => r[header] === value)
                     .reduce((sum, r) => sum + r.count, 0);
                 
+                // Use qualified label if there's a collision, otherwise just the value
+                const label = valueCollisions.has(value) ? `${value} (${header})` : value;
+                
                 const nodeIndex = nodes.length;
                 nodeMap.set(id, nodeIndex);
                 nodes.push({
                     id,
-                    label: value, // Just show the value, not "header: value"
+                    label,
                     header,
                     value,
                     dimIndex,
@@ -442,7 +470,7 @@ class CSVPlotter {
         return { nodePositions, linkPositions };
     }
 
-    private drawNodes(g: SVGGElement, nodeData: any, nodePositions: Map<number, any>, dimensionHeaders: string[]) {
+    private drawNodes(g: SVGGElement, nodeData: any, nodePositions: Map<number, any>) {
         const { nodes } = nodeData;
         const colors = [
             '#667eea', '#ea4c89', '#7eea4c', '#ead24c', '#ca4cea', '#4ceaad'
@@ -470,7 +498,7 @@ class CSVPlotter {
             
             // Node label
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            text.setAttribute('x', (pos.x + 35).toString());
+            text.setAttribute('x', (pos.x + 45).toString()); // Increased from 35 to 45 for more space
             text.setAttribute('y', (pos.y + pos.height / 2).toString());
             text.setAttribute('dy', '0.35em');
             text.setAttribute('font-size', '12');
@@ -858,11 +886,8 @@ class CSVPlotter {
                 console.error('Error attempting to enable fullscreen:', err);
             });
         } else {
-            // Exit fullscreen
-            document.exitFullscreen().then(() => {
-                // Re-layout back to normal size
-                setTimeout(() => this.relayoutForNormal(), 100);
-            }).catch(err => {
+            // Exit fullscreen (the fullscreen listener will handle re-layout)
+            document.exitFullscreen().catch(err => {
                 console.error('Error attempting to exit fullscreen:', err);
             });
         }
@@ -877,8 +902,8 @@ class CSVPlotter {
         const svg = this.plotContainer.querySelector('svg') as SVGElement;
         if (!svg) return;
 
-        // Calculate optimal dimensions (use 90% of screen to leave some padding)
-        const optimalWidth = Math.floor(width * 0.9);
+        // Calculate optimal dimensions (use 85% of screen width, 90% height for extra label space)
+        const optimalWidth = Math.floor(width * 0.85);
         const optimalHeight = Math.floor(height * 0.9);
         
         // Update SVG viewBox and size for fullscreen
@@ -921,7 +946,10 @@ class CSVPlotter {
             svg.removeChild(svg.firstChild);
         }
 
-        const margin = { top: 60, right: 60, bottom: 40, left: 60 };
+        // Use larger margins for fullscreen to accommodate longer labels
+        const isFullscreen = !!document.fullscreenElement;
+        const rightMargin = isFullscreen ? 200 : 120; // Extra space in fullscreen
+        const margin = { top: 60, right: rightMargin, bottom: 40, left: 60 };
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
 
@@ -940,7 +968,7 @@ class CSVPlotter {
         this.drawLinks(g, nodeData, nodePositions, linkPositions);
         
         // Draw nodes
-        this.drawNodes(g, nodeData, nodePositions, dimensionHeaders);
+        this.drawNodes(g, nodeData, nodePositions);
 
         // Add title
         this.addTitle(svg, width);
