@@ -128,7 +128,7 @@ main {
     gap: 20px;
 }
 
-.process-btn, .clear-btn {
+.process-btn, .clear-btn, .fullscreen-btn {
     padding: 15px 30px;
     border: none;
     border-radius: 50px;
@@ -162,6 +162,16 @@ main {
 }
 
 .clear-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.fullscreen-btn {
+    background: linear-gradient(135deg, #6f42c1 0%, #007bff 100%);
+    color: white;
+}
+
+.fullscreen-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
@@ -286,4 +296,19 @@ footer {
     .summary-stats {
         grid-template-columns: 1fr;
     }
+}
+
+/* Fullscreen styles */
+.plot-container:fullscreen {
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.plot-container:fullscreen svg {
+    max-width: 100%;
+    max-height: 100%;
+    background: rgba(255, 255, 255, 0.95) !important;
 }

@@ -7,6 +7,7 @@ class CSVPlotter {
     private fileInput: HTMLInputElement;
     private processBtn: HTMLButtonElement;
     private clearBtn: HTMLButtonElement;
+    private fullscreenBtn: HTMLButtonElement;
     private fileInfo: HTMLElement;
     private fileName: HTMLElement;
     private fileSize: HTMLElement;
@@ -31,6 +32,7 @@ class CSVPlotter {
         this.fileInput = document.getElementById('csvFile') as HTMLInputElement;
         this.processBtn = document.getElementById('processBtn') as HTMLButtonElement;
         this.clearBtn = document.getElementById('clearBtn') as HTMLButtonElement;
+        this.fullscreenBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement;
         this.fileInfo = document.getElementById('fileInfo') as HTMLElement;
         this.fileName = document.getElementById('fileName') as HTMLElement;
         this.fileSize = document.getElementById('fileSize') as HTMLElement;
@@ -46,6 +48,7 @@ class CSVPlotter {
         this.fileInput.addEventListener('change', this.handleFileSelect.bind(this));
         this.processBtn.addEventListener('click', this.processCSV.bind(this));
         this.clearBtn.addEventListener('click', this.clearData.bind(this));
+        this.fullscreenBtn.addEventListener('click', this.toggleFullscreen.bind(this));
     }
 
     private handleFileSelect(event: Event): void {
@@ -81,6 +84,7 @@ class CSVPlotter {
             this.updateDataSummary();
             this.generatePlot();
             this.clearBtn.style.display = 'inline-block';
+            this.fullscreenBtn.style.display = 'inline-block';
         } catch (error) {
             console.error('Error processing CSV:', error);
             alert('Error processing CSV file. Please check the format.');
@@ -834,6 +838,7 @@ class CSVPlotter {
         this.dataSummary.style.display = 'none';
         this.processBtn.disabled = true;
         this.clearBtn.style.display = 'none';
+        this.fullscreenBtn.style.display = 'none';
         
         // Reset plot container
         this.plotContainer.innerHTML = `
@@ -841,6 +846,109 @@ class CSVPlotter {
                 <p>Upload a CSV file to generate a plot</p>
             </div>
         `;
+    }
+
+    private toggleFullscreen(): void {
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
+            this.plotContainer.requestFullscreen().then(() => {
+                // Wait a bit for fullscreen to activate, then re-layout
+                setTimeout(() => this.relayoutForFullscreen(), 100);
+            }).catch(err => {
+                console.error('Error attempting to enable fullscreen:', err);
+            });
+        } else {
+            // Exit fullscreen
+            document.exitFullscreen().then(() => {
+                // Re-layout back to normal size
+                setTimeout(() => this.relayoutForNormal(), 100);
+            }).catch(err => {
+                console.error('Error attempting to exit fullscreen:', err);
+            });
+        }
+    }
+
+    private relayoutForFullscreen(): void {
+        // Get fullscreen dimensions
+        const width = window.screen.width;
+        const height = window.screen.height;
+        
+        // Find the SVG element
+        const svg = this.plotContainer.querySelector('svg') as SVGElement;
+        if (!svg) return;
+
+        // Calculate optimal dimensions (use 90% of screen to leave some padding)
+        const optimalWidth = Math.floor(width * 0.9);
+        const optimalHeight = Math.floor(height * 0.9);
+        
+        // Update SVG viewBox and size for fullscreen
+        svg.setAttribute('viewBox', `0 0 ${optimalWidth} ${optimalHeight}`);
+        svg.style.width = `${optimalWidth}px`;
+        svg.style.height = `${optimalHeight}px`;
+        
+        // Re-generate the plot with new dimensions
+        this.regeneratePlotWithDimensions(optimalWidth, optimalHeight);
+    }
+
+    private relayoutForNormal(): void {
+        // Find the SVG element
+        const svg = this.plotContainer.querySelector('svg') as SVGElement;
+        if (!svg) return;
+
+        // Reset to normal dimensions
+        const normalWidth = 800;
+        const normalHeight = 600;
+        
+        svg.setAttribute('viewBox', `0 0 ${normalWidth} ${normalHeight}`);
+        svg.style.width = '100%';
+        svg.style.height = '600px';
+        
+        // Re-generate the plot with normal dimensions
+        this.regeneratePlotWithDimensions(normalWidth, normalHeight);
+    }
+
+    private regeneratePlotWithDimensions(width: number, height: number): void {
+        const dimensionHeaders = this.headers.slice(0, -1);
+        
+        if (dimensionHeaders.length < 2) return;
+
+        // Clear existing content
+        const svg = this.plotContainer.querySelector('svg') as SVGElement;
+        if (!svg) return;
+        
+        // Remove existing content but keep the SVG element
+        while (svg.firstChild) {
+            svg.removeChild(svg.firstChild);
+        }
+
+        const margin = { top: 60, right: 60, bottom: 40, left: 60 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        // Create data structure for nodes and links
+        const nodeData = this.prepareSankeyData(dimensionHeaders);
+        
+        // Calculate positions with new dimensions
+        const { nodePositions, linkPositions } = this.calculatePositions(nodeData, chartWidth, chartHeight, dimensionHeaders);
+        
+        // Create main group
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('transform', `translate(${margin.left},${margin.top})`);
+        svg.appendChild(g);
+
+        // Draw links first (so they appear behind nodes)
+        this.drawLinks(g, nodeData, nodePositions, linkPositions);
+        
+        // Draw nodes
+        this.drawNodes(g, nodeData, nodePositions, dimensionHeaders);
+
+        // Add title
+        this.addTitle(svg, width);
+        
+        // Add double-click to clear all selections
+        svg.addEventListener('dblclick', () => {
+            this.clearAllSelections(g);
+        });
     }
 }
 
